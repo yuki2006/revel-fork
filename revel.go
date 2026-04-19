@@ -63,12 +63,11 @@ var (
 	// the current process reality.  For example, if the app is configured for
 	// port 9000, HTTPPort will always be 9000, even though in dev mode it is
 	// run on a random port and proxied.
-	HTTPPort       int    // e.g. 9000
-	HTTPAddr       string // e.g. "", "127.0.0.1"
-	HTTPSsl        bool   // e.g. true if using ssl
-	HTTPSslCert    string // e.g. "/path/to/cert.pem"
-	HTTPSslKey     string // e.g. "/path/to/key.pem"
-	HTTPUnixSocket string // e.g. "/var/run/app.sock"
+	HTTPPort    int    // e.g. 9000
+	HTTPAddr    string // e.g. "", "127.0.0.1", "unix:///var/run/app.sock"
+	HTTPSsl     bool   // e.g. true if using ssl
+	HTTPSslCert string // e.g. "/path/to/cert.pem"
+	HTTPSslKey  string // e.g. "/path/to/key.pem"
 
 	// All cookies dropped by the framework begin with this prefix.
 	CookiePrefix string
@@ -160,7 +159,6 @@ func Init(inputmode, importPath, srcPath string) {
 	DevMode = Config.BoolDefault("mode.dev", false)
 	HTTPPort = Config.IntDefault("http.port", 9000)
 	HTTPAddr = Config.StringDefault("http.addr", "")
-	HTTPUnixSocket = Config.StringDefault("http.unix.socket", "")
 	HTTPSsl = Config.BoolDefault("http.ssl", false)
 	HTTPSslCert = Config.StringDefault("http.sslcert", "")
 	HTTPSslKey = Config.StringDefault("http.sslkey", "")

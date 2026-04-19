@@ -107,10 +107,10 @@ func InitServerEngine(port int, serverEngine string) {
 		localAddress string
 	)
 
-	if HTTPUnixSocket != "" {
-		// http.unix.socket が設定されている場合、Unix ドメインソケットを使用
+	if strings.HasPrefix(address, "unix://") {
+		// http.addr = unix:///var/run/app.sock 形式の場合、Unix ドメインソケットを使用
 		network = "unix"
-		localAddress = HTTPUnixSocket
+		localAddress = strings.TrimPrefix(address, "unix://")
 		port = 0
 	} else if port == 0 {
 		// If the port is zero, treat the address as a fully qualified local address.

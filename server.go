@@ -107,10 +107,15 @@ func InitServerEngine(port int, serverEngine string) {
 		localAddress string
 	)
 
-	// If the port is zero, treat the address as a fully qualified local address.
-	// This address must be prefixed with the network type followed by a colon,
-	// e.g. unix:/tmp/app.socket or tcp6:::1 (equivalent to tcp6:0:0:0:0:0:0:0:1)
-	if port == 0 {
+	if HTTPUnixSocket != "" {
+		// http.unix.socket が設定されている場合、Unix ドメインソケットを使用
+		network = "unix"
+		localAddress = HTTPUnixSocket
+		port = 0
+	} else if port == 0 {
+		// If the port is zero, treat the address as a fully qualified local address.
+		// This address must be prefixed with the network type followed by a colon,
+		// e.g. unix:/tmp/app.socket or tcp6:::1 (equivalent to tcp6:0:0:0:0:0:0:0:1)
 		parts := strings.SplitN(address, ":", 2)
 		network = parts[0]
 		localAddress = parts[1]

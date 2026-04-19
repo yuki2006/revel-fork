@@ -3,13 +3,10 @@ module github.com/revel/revel
 go 1.25.0
 
 require (
-	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-stack/stack v1.8.1
-	github.com/gomodule/redigo v1.9.3
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-colorable v0.1.14
-	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/revel/config v1.1.0
 	github.com/revel/log15 v2.11.20+incompatible
 	github.com/revel/pathtree v0.0.0-20140121041023-41257a1839e9

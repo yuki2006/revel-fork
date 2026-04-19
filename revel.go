@@ -64,7 +64,7 @@ var (
 	// port 9000, HTTPPort will always be 9000, even though in dev mode it is
 	// run on a random port and proxied.
 	HTTPPort    int    // e.g. 9000
-	HTTPAddr    string // e.g. "", "127.0.0.1"
+	HTTPAddr    string // e.g. "", "127.0.0.1", "unix:///var/run/app.sock"
 	HTTPSsl     bool   // e.g. true if using ssl
 	HTTPSslCert string // e.g. "/path/to/cert.pem"
 	HTTPSslKey  string // e.g. "/path/to/key.pem"

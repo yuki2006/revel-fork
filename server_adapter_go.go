@@ -40,6 +40,7 @@ type GoHttpServer struct {
 	HttpMuxList          ServerMuxList
 	HasAppMux            bool
 	signalChan           chan os.Signal
+	unixSocketPath       string                 // Unix domain socket path (for cleanup on shutdown)
 }
 
 // Called to initialize the server with this EngineInit.
@@ -88,10 +89,28 @@ func (g *GoHttpServer) Start() {
 		serverLogger.Fatal("Failed to listen:", "error",
 			g.Server.ListenAndServeTLS(HTTPSslCert, HTTPSslKey))
 	} else {
+		// Unix ドメインソケットの場合、既存のソケットファイルを削除
+		if g.ServerInit.Network == "unix" {
+			if err := os.Remove(g.Server.Addr); err != nil && !os.IsNotExist(err) {
+				serverLogger.Fatal("Failed to remove existing socket file:", "error", err)
+			}
+		}
+
 		listener, err := net.Listen(g.ServerInit.Network, g.Server.Addr)
 		if err != nil {
 			serverLogger.Fatal("Failed to listen:", "error", err)
 		}
+
+		// Unix ドメインソケットのパーミッション設定
+		if g.ServerInit.Network == "unix" {
+			socketPerms := os.FileMode(Config.IntDefault("http.unix.perms", 0666))
+			if err := os.Chmod(g.Server.Addr, socketPerms); err != nil {
+				serverLogger.Fatal("Failed to set socket permissions:", "error", err)
+			}
+			g.unixSocketPath = g.Server.Addr
+			serverLogger.Infof("Unix socket created: %s (perms: %o)", g.Server.Addr, socketPerms)
+		}
+
 		serverLogger.Warn("Server exiting:", "error", g.Server.Serve(listener))
 	}
 }
@@ -227,6 +246,12 @@ func (g *GoHttpServer) Event(event Event, args interface{}) (r EventResponse) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Config.IntDefault("app.cancel.timeout", 60)))
 		defer cancel()
 		g.Server.Shutdown(ctx)
+		// Unix ドメインソケットファイルをクリーンアップ
+		if g.unixSocketPath != "" {
+			if err := os.Remove(g.unixSocketPath); err != nil && !os.IsNotExist(err) {
+				serverLogger.Warn("Failed to remove unix socket on shutdown:", "error", err)
+			}
+		}
 	default:
 	}
 

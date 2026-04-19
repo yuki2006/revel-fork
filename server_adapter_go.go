@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -89,8 +90,12 @@ func (g *GoHttpServer) Start() {
 		serverLogger.Fatal("Failed to listen:", "error",
 			g.Server.ListenAndServeTLS(HTTPSslCert, HTTPSslKey))
 	} else {
-		// Unix ドメインソケットの場合、既存のソケットファイルを削除
+		// Unix ドメインソケットの場合、ディレクトリ作成と既存ソケットファイルの削除
 		if g.ServerInit.Network == "unix" {
+			socketDir := filepath.Dir(g.Server.Addr)
+			if err := os.MkdirAll(socketDir, 0755); err != nil {
+				serverLogger.Fatal("Failed to create socket directory:", "path", socketDir, "error", err)
+			}
 			if err := os.Remove(g.Server.Addr); err != nil && !os.IsNotExist(err) {
 				serverLogger.Fatal("Failed to remove existing socket file:", "error", err)
 			}

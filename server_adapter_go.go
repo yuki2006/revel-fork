@@ -108,7 +108,7 @@ func (g *GoHttpServer) Start() {
 
 		// Unix ドメインソケットのパーミッション設定
 		if g.ServerInit.Network == "unix" {
-			socketPerms := os.FileMode(Config.IntDefault("http.unix.perms", 0777))
+			socketPerms := os.FileMode(Config.IntDefault("http.unix.perms", 0666))
 			if err := os.Chmod(g.Server.Addr, socketPerms); err != nil {
 				serverLogger.Fatal("Failed to set socket permissions:", "error", err)
 			}

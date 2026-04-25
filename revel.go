@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"go/build"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -151,6 +152,9 @@ func Init(inputmode, importPath, srcPath string) {
 	if err != nil || Config == nil {
 		RevelLog.Fatal("Failed to load app.conf:", "error", err)
 	}
+
+	// app.conf 内の ${ENV_VAR} を環境変数で展開する
+	expandConfigEnvVars(Config)
 
 	// After application config is loaded update the logger
 	updateLog(inputmode)
@@ -325,4 +329,25 @@ func findSrcPaths(importPath string) (revelSourcePath, appSourcePath string) {
 	}
 
 	return revelPkg.Dir, appPkg.Dir
+}
+
+// expandConfigEnvVars は Config 内の全オプション値の ${VAR} を環境変数で展開する。
+// .env ファイルを事前に godotenv 等で読み込んでおけば、app.conf で環境変数を参照できる。
+//
+//	例: db.spec = ${DB_SPEC}
+func expandConfigEnvVars(ctx *config.Context) {
+	raw := ctx.Raw()
+	for _, section := range raw.Sections() {
+		options, _ := raw.SectionOptions(section)
+		for _, option := range options {
+			val, err := raw.String(section, option)
+			if err != nil {
+				continue
+			}
+			expanded := os.ExpandEnv(val)
+			if expanded != val {
+				raw.AddOption(section, option, expanded)
+			}
+		}
+	}
 }

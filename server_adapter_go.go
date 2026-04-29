@@ -72,6 +72,7 @@ func (g *GoHttpServer) Init(init *EngineInit) {
 		Handler:      revelHandler,
 		ReadTimeout:  time.Duration(Config.IntDefault("http.timeout.read", 0)) * time.Second,
 		WriteTimeout: time.Duration(Config.IntDefault("http.timeout.write", 0)) * time.Second,
+		IdleTimeout:  time.Duration(Config.IntDefault("http.timeout.idle", 60)) * time.Second,
 	}
 }
 

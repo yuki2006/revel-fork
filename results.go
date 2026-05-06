@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -32,6 +33,19 @@ type ErrorResult struct {
 }
 
 var resultsLog = RevelLog.New("section", "results")
+
+// logResponseWriteError logs a failure while writing to a response stream
+// (HTTP body or WebSocket message). EPIPE / ECONNRESET indicate the peer
+// (client or upstream proxy) closed the connection before we finished
+// writing — a normal event, not a server bug — so they are logged at Warn to
+// avoid firing Cloud Error Reporting. Other write failures stay at Error.
+func logResponseWriteError(msg string, err error) {
+	if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+		resultsLog.Warn(msg, "error", err)
+		return
+	}
+	resultsLog.Error(msg, "error", err)
+}
 
 func (r ErrorResult) Apply(req *Request, resp *Response) {
 	format := req.Format
@@ -108,12 +122,12 @@ func (r ErrorResult) Apply(req *Request, resp *Response) {
 	// net/http panics if we write to a hijacked connection
 	if req.Method == "WS" {
 		if err := req.WebSocket.MessageSendJSON(fmt.Sprint(revelError)); err != nil {
-			resultsLog.Error("Apply: Send failed", "error", err)
+			logResponseWriteError("Apply: Send failed", err)
 		}
 	} else {
 		resp.WriteHeader(status, contentType)
 		if _, err := b.WriteTo(resp.GetWriter()); err != nil {
-			resultsLog.Error("Apply: Response WriteTo failed:", "error", err)
+			logResponseWriteError("Apply: Response WriteTo failed:", err)
 		}
 	}
 }
@@ -126,7 +140,7 @@ type PlaintextErrorResult struct {
 func (r PlaintextErrorResult) Apply(req *Request, resp *Response) {
 	resp.WriteHeader(http.StatusInternalServerError, "text/plain; charset=utf-8")
 	if _, err := resp.GetWriter().Write([]byte(r.Error.Error())); err != nil {
-		resultsLog.Error("Apply: Write error:", "error", err)
+		logResponseWriteError("Apply: Write error:", err)
 	}
 }
 
@@ -181,7 +195,7 @@ func (r *RenderTemplateResult) Apply(req *Request, resp *Response) {
 	}
 	resp.WriteHeader(http.StatusOK, "text/html; charset=utf-8")
 	if _, err := b.WriteTo(out); err != nil {
-		resultsLog.Error("Apply: Response write failed", "error", err)
+		logResponseWriteError("Apply: Response write failed", err)
 	}
 }
 
@@ -299,7 +313,7 @@ type RenderHTMLResult struct {
 func (r RenderHTMLResult) Apply(req *Request, resp *Response) {
 	resp.WriteHeader(http.StatusOK, "text/html; charset=utf-8")
 	if _, err := resp.GetWriter().Write([]byte(r.html)); err != nil {
-		resultsLog.Error("Apply: Response write failed", "error", err)
+		logResponseWriteError("Apply: Response write failed", err)
 	}
 }
 
@@ -325,20 +339,20 @@ func (r RenderJSONResult) Apply(req *Request, resp *Response) {
 	if r.callback == "" {
 		resp.WriteHeader(http.StatusOK, "application/json; charset=utf-8")
 		if _, err = resp.GetWriter().Write(b); err != nil {
-			resultsLog.Error("Apply: Response write failed:", "error", err)
+			logResponseWriteError("Apply: Response write failed:", err)
 		}
 		return
 	}
 
 	resp.WriteHeader(http.StatusOK, "application/javascript; charset=utf-8")
 	if _, err = resp.GetWriter().Write([]byte(r.callback + "(")); err != nil {
-		resultsLog.Error("Apply: Response write failed", "error", err)
+		logResponseWriteError("Apply: Response write failed", err)
 	}
 	if _, err = resp.GetWriter().Write(b); err != nil {
-		resultsLog.Error("Apply: Response write failed", "error", err)
+		logResponseWriteError("Apply: Response write failed", err)
 	}
 	if _, err = resp.GetWriter().Write([]byte(");")); err != nil {
-		resultsLog.Error("Apply: Response write failed", "error", err)
+		logResponseWriteError("Apply: Response write failed", err)
 	}
 }
 
@@ -362,7 +376,7 @@ func (r RenderXMLResult) Apply(req *Request, resp *Response) {
 
 	resp.WriteHeader(http.StatusOK, "application/xml; charset=utf-8")
 	if _, err = resp.GetWriter().Write(b); err != nil {
-		resultsLog.Error("Apply: Response write failed", "error", err)
+		logResponseWriteError("Apply: Response write failed", err)
 	}
 }
 
@@ -373,7 +387,7 @@ type RenderTextResult struct {
 func (r RenderTextResult) Apply(req *Request, resp *Response) {
 	resp.WriteHeader(http.StatusOK, "text/plain; charset=utf-8")
 	if _, err := resp.GetWriter().Write([]byte(r.text)); err != nil {
-		resultsLog.Error("Apply: Response write failed", "error", err)
+		logResponseWriteError("Apply: Response write failed", err)
 	}
 }
 
@@ -422,7 +436,7 @@ func (r *BinaryResult) Apply(req *Request, resp *Response) {
 	// Write stream writes the status code to the header as well
 	if ws := resp.GetStreamWriter(); ws != nil {
 		if err := ws.WriteStream(r.Name, r.Length, r.ModTime, r.Reader); err != nil {
-			resultsLog.Error("Apply: Response write failed", "error", err)
+			logResponseWriteError("Apply: Response write failed", err)
 		}
 	}
 

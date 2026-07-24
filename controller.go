@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"time"
 
@@ -170,25 +169,12 @@ func (c *Controller) setStatusIfNil(status int) {
 func (c *Controller) Render(extraViewArgs ...interface{}) Result {
 	c.setStatusIfNil(http.StatusOK)
 
-	// Get the calling function line number.
-	_, _, line, ok := runtime.Caller(1)
-	if !ok {
-		controllerLog.Error("Render: Failed to get Caller information")
-	}
-
-	// Get the extra ViewArgs passed in.
-	if renderArgNames, ok := c.MethodType.RenderArgNames[line]; ok {
-		if len(renderArgNames) == len(extraViewArgs) {
-			for i, extraRenderArg := range extraViewArgs {
-				c.ViewArgs[renderArgNames[i]] = extraRenderArg
-			}
-		} else {
-			controllerLog.Error(fmt.Sprint(len(renderArgNames), "RenderArg names found for",
-				len(extraViewArgs), "extra ViewArgs"))
-		}
-	} else {
-		controllerLog.Error(fmt.Sprint("No RenderArg names found for Render call on line", line,
-			"(Action", c.Action, ")"), "stack", logger.NewCallStack())
+	// RenderArgNames(位置引数→名前の実行時推定)は廃止した。テンプレートへ渡す値は
+	// c.ViewArgs["名前"] = 値 と明示代入する運用のため、ここではマッピングを行わない。
+	// 誤って位置引数が渡された場合は警告のみ出す(サイレントに値が消える事故を防ぐ)。
+	if len(extraViewArgs) > 0 {
+		controllerLog.Warn("Render called with positional args; set c.ViewArgs explicitly instead",
+			"action", c.Action, "count", len(extraViewArgs))
 	}
 
 	return c.RenderTemplate(c.Name + "/" + c.MethodType.Name + "." + c.Request.Format)

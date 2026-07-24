@@ -28,11 +28,10 @@ type ControllerFieldPath struct {
 }
 
 type MethodType struct {
-	Name           string
-	Args           []*MethodArg
-	RenderArgNames map[int][]string
-	lowerName      string
-	Index          int
+	Name      string
+	Args      []*MethodArg
+	lowerName string
+	Index     int
 }
 
 type MethodArg struct {

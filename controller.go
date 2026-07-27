@@ -145,37 +145,24 @@ func (c *Controller) setStatusIfNil(status int) {
 }
 
 // Render a template corresponding to the calling Controller method.
-// Arguments will be added to c.ViewArgs prior to rendering the template.
-// They are keyed on their local identifier.
+// Values passed to the template must be assigned to c.ViewArgs explicitly.
 //
 // For example:
 //
-//     func (c Users) ShowUser(id int) revel.Result {
-//     	 user := loadUser(id)
-//     	 return c.Render(user)
-//     }
+//	func (c Users) ShowUser(id int) revel.Result {
+//		 c.ViewArgs["user"] = loadUser(id)
+//		 return c.Render()
+//	}
 //
-// This action will render views/Users/ShowUser.html, passing in an extra
-// key-value "user": (User).
+// This action will render views/Users/ShowUser.html.
 //
-// This is the slower magical version which uses the runtime
-// to determine
-// 1) Set c.ViewArgs to the arguments passed into this function
-// 2) How to call the RenderTemplate by building the following line
-// c.RenderTemplate(c.Name + "/" + c.MethodType.Name + "." + c.Request.Format)
-//
-// If you want your code to run faster it is recommended you add the template values directly
-// to the c.ViewArgs and call c.RenderTemplate directly.
-func (c *Controller) Render(extraViewArgs ...interface{}) Result {
+// This function used to take variadic arguments and infer their names by parsing
+// the caller's source line (RenderArgNames). When the argument count in the source
+// disagreed with the compiled binary, the values were silently dropped and parts of
+// the page disappeared, so the whole mechanism was removed. Taking no arguments makes
+// passing positional values a compile error instead of a silent failure.
+func (c *Controller) Render() Result {
 	c.setStatusIfNil(http.StatusOK)
-
-	// RenderArgNames(位置引数→名前の実行時推定)は廃止した。テンプレートへ渡す値は
-	// c.ViewArgs["名前"] = 値 と明示代入する運用のため、ここではマッピングを行わない。
-	// 誤って位置引数が渡された場合は警告のみ出す(サイレントに値が消える事故を防ぐ)。
-	if len(extraViewArgs) > 0 {
-		controllerLog.Warn("Render called with positional args; set c.ViewArgs explicitly instead",
-			"action", c.Action, "count", len(extraViewArgs))
-	}
 
 	return c.RenderTemplate(c.Name + "/" + c.MethodType.Name + "." + c.Request.Format)
 }
@@ -329,9 +316,10 @@ func (c *Controller) RenderBinary(memfile io.Reader, filename string, delivery C
 }
 
 // Redirect to an action or to a URL.
-//   c.Redirect(Controller.Action)
-//   c.Redirect("/controller/action")
-//   c.Redirect("/controller/%d/action", id)
+//
+//	c.Redirect(Controller.Action)
+//	c.Redirect("/controller/action")
+//	c.Redirect("/controller/%d/action", id)
 func (c *Controller) Redirect(val interface{}, args ...interface{}) Result {
 	c.setStatusIfNil(http.StatusFound)
 

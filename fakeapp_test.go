@@ -35,10 +35,9 @@ type Application struct {
 }
 
 func (c Hotels) Show(id int) Result {
-	title := "View Hotel"
-	hotel := &Hotel{id, "A Hotel", "300 Main St.", "New York", "NY", "10010", "USA", 300}
-	// The line number below must match the one with the code : RenderArgNames: map[int][]string{43: {"title", "hotel"}},
-	return c.Render(title, hotel)
+	c.ViewArgs["title"] = "View Hotel"
+	c.ViewArgs["hotel"] = &Hotel{id, "A Hotel", "300 Main St.", "New York", "NY", "10010", "USA", 300}
+	return c.Render()
 }
 
 func (c Hotels) Book(id int) Result {
@@ -82,7 +81,6 @@ func registerControllers() {
 				Args: []*MethodArg{
 					{"id", reflect.TypeOf((*int)(nil))},
 				},
-				RenderArgNames: map[int][]string{41: {"title", "hotel"}},
 			},
 			{
 				Name: "Book",
@@ -100,7 +98,6 @@ func registerControllers() {
 					{Name: "prefix", Type: reflect.TypeOf((*string)(nil))},
 					{Name: "filepath", Type: reflect.TypeOf((*string)(nil))},
 				},
-				RenderArgNames: map[int][]string{},
 			},
 		})
 	RegisterController((*Implicit)(nil),
@@ -111,7 +108,6 @@ func registerControllers() {
 					{Name: "prefix", Type: reflect.TypeOf((*string)(nil))},
 					{Name: "filepath", Type: reflect.TypeOf((*string)(nil))},
 				},
-				RenderArgNames: map[int][]string{},
 			},
 		})
 	RegisterController((*Application)(nil),
@@ -122,7 +118,6 @@ func registerControllers() {
 					{Name: "prefix", Type: reflect.TypeOf((*string)(nil))},
 					{Name: "filepath", Type: reflect.TypeOf((*string)(nil))},
 				},
-				RenderArgNames: map[int][]string{},
 			},
 			{
 				Name: "Index",
@@ -130,7 +125,6 @@ func registerControllers() {
 					{Name: "foo", Type: reflect.TypeOf((*string)(nil))},
 					{Name: "bar", Type: reflect.TypeOf((*string)(nil))},
 				},
-				RenderArgNames: map[int][]string{},
 			},
 		})
 }

@@ -137,6 +137,78 @@ func TestSystemdListenerQueuesDuringRestart(t *testing.T) {
 	}
 }
 
+// systemd と同じく、起動した時点で LISTEN_PID が自分の PID になっている子を起動し、
+// パッケージの init で受け取られていること(systemdPassed)と、元の fd 3 が閉じられて
+// いること(この後に起動する子プロセスへ漏れない)を確かめる。
+// sh の $$ は exec 後も同じ PID なので、LISTEN_PID=$$ で systemd の渡し方を再現できる。
+func TestSystemdListenerTakenAtInit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("ExtraFiles(fd の受け渡し)は Windows では使えない")
+	}
+	sock := filepath.Join(t.TempDir(), "s.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln.(*net.UnixListener).SetUnlinkOnClose(false)
+	f, err := ln.(*net.UnixListener).File()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln.Close()
+
+	cmd := exec.Command("sh", "-c", `LISTEN_PID=$$ LISTEN_FDS=1 exec "$0" -test.run='^TestSystemdListenerInitChild$'`, os.Args[0])
+	cmd.Env = append(os.Environ(), "SYSTEMD_LISTENER_TEST_INIT_CHILD=1")
+	cmd.ExtraFiles = []*os.File{f}
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	if line, err := bufio.NewReader(out).ReadString('\n'); err != nil || strings.TrimSpace(line) != "ready" {
+		cmd.Wait()
+		t.Fatalf("子の出力 = %q, %v", line, err)
+	}
+	c, err := net.Dial("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if line, err := bufio.NewReader(c).ReadString('\n'); err != nil || strings.TrimSpace(line) != "hello" {
+		t.Fatalf("子からの応答 = %q, %v", line, err)
+	}
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("子が失敗した: %v", err)
+	}
+}
+
+// TestSystemdListenerInitChild は TestSystemdListenerTakenAtInit が子プロセスとして起動する。
+func TestSystemdListenerInitChild(t *testing.T) {
+	if os.Getenv("SYSTEMD_LISTENER_TEST_INIT_CHILD") != "1" {
+		t.Skip("子プロセスとしてだけ動く")
+	}
+	if systemdPassed.err != nil || !systemdPassed.ok {
+		t.Fatalf("init で受け取れていない: ok %v, err %v", systemdPassed.ok, systemdPassed.err)
+	}
+	if _, err := os.Stat("/proc/self/fd/3"); err == nil {
+		// 3 番が別のファイルに再利用されていることはありうるので、ソケットかどうかで見る
+		if target, _ := os.Readlink("/proc/self/fd/3"); strings.HasPrefix(target, "socket:") {
+			t.Errorf("元の fd 3 がまだ開いている: %s", target)
+		}
+	}
+	os.Stdout.WriteString("ready\n")
+	c, err := systemdPassed.listener.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Write([]byte("hello\n"))
+	c.Close()
+}
+
 // TestSystemdListenerChild は上のテストが子プロセスとして起動する。単独では何もしない。
 func TestSystemdListenerChild(t *testing.T) {
 	if os.Getenv("SYSTEMD_LISTENER_TEST_CHILD") != "1" {

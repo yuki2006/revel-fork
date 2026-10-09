@@ -91,9 +91,9 @@ func (g *GoHttpServer) Start() {
 		serverLogger.Fatal("Failed to listen:", "error",
 			g.Server.ListenAndServeTLS(HTTPSslCert, HTTPSslKey))
 	} else {
-		// systemd がソケットを渡していればそれを使う(systemd_listener.go)。
+		// systemd がソケットを渡していればそれを使う(systemd_listener.go。起動直後に受け取ってある)。
 		// ソケットファイルも systemd のものなので、作り直しも終了時の削除もしない。
-		listener, activated, err := systemdListener()
+		listener, activated, err := systemdPassed.listener, systemdPassed.ok, systemdPassed.err
 		if err != nil {
 			serverLogger.Fatal("Failed to use socket passed by systemd:", "error", err)
 		}

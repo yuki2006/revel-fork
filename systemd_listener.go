@@ -10,6 +10,19 @@ import (
 // (sd_listen_fds の SD_LISTEN_FDS_START)。0〜2 は標準入出力なので 3 から並ぶ。
 const systemdListenFdsStart = 3
 
+// systemdPassed は起動直後(パッケージの init)に受け取った、systemd のソケット。
+// GoHttpServer.Start が使う。Start はアプリの OnAppStart の後に走るので、そこで受け取ると、
+// それまでに起動した子プロセス(ジャッジなど)へ close-on-exec の付いていない fd 3 が漏れる。
+var systemdPassed struct {
+	listener net.Listener
+	ok       bool
+	err      error
+}
+
+func init() {
+	systemdPassed.listener, systemdPassed.ok, systemdPassed.err = systemdListener()
+}
+
 // systemdListener は systemd のソケットアクティベーション(yukicoder.socket など)で
 // 渡された待ち受けソケットを返す。渡されていなければ ok=false。
 //

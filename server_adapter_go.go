@@ -91,30 +91,40 @@ func (g *GoHttpServer) Start() {
 		serverLogger.Fatal("Failed to listen:", "error",
 			g.Server.ListenAndServeTLS(HTTPSslCert, HTTPSslKey))
 	} else {
-		// Unix ドメインソケットの場合、ディレクトリ作成と既存ソケットファイルの削除
-		if g.ServerInit.Network == "unix" {
-			socketDir := filepath.Dir(g.Server.Addr)
-			if err := os.MkdirAll(socketDir, 0755); err != nil {
-				serverLogger.Fatal("Failed to create socket directory:", "path", socketDir, "error", err)
-			}
-			if err := os.Remove(g.Server.Addr); err != nil && !os.IsNotExist(err) {
-				serverLogger.Fatal("Failed to remove existing socket file:", "error", err)
-			}
-		}
-
-		listener, err := net.Listen(g.ServerInit.Network, g.Server.Addr)
+		// systemd がソケットを渡していればそれを使う(systemd_listener.go)。
+		// ソケットファイルも systemd のものなので、作り直しも終了時の削除もしない。
+		listener, activated, err := systemdListener()
 		if err != nil {
-			serverLogger.Fatal("Failed to listen:", "error", err)
+			serverLogger.Fatal("Failed to use socket passed by systemd:", "error", err)
 		}
-
-		// Unix ドメインソケットのパーミッション設定
-		if g.ServerInit.Network == "unix" {
-			socketPerms := os.FileMode(Config.IntDefault("http.unix.perms", 0666))
-			if err := os.Chmod(g.Server.Addr, socketPerms); err != nil {
-				serverLogger.Fatal("Failed to set socket permissions:", "error", err)
+		if activated {
+			serverLogger.Infof("Using socket passed by systemd: %s", listener.Addr())
+		} else {
+			// Unix ドメインソケットの場合、ディレクトリ作成と既存ソケットファイルの削除
+			if g.ServerInit.Network == "unix" {
+				socketDir := filepath.Dir(g.Server.Addr)
+				if err := os.MkdirAll(socketDir, 0755); err != nil {
+					serverLogger.Fatal("Failed to create socket directory:", "path", socketDir, "error", err)
+				}
+				if err := os.Remove(g.Server.Addr); err != nil && !os.IsNotExist(err) {
+					serverLogger.Fatal("Failed to remove existing socket file:", "error", err)
+				}
 			}
-			g.unixSocketPath = g.Server.Addr
-			serverLogger.Infof("Unix socket created: %s (perms: %o)", g.Server.Addr, socketPerms)
+
+			listener, err = net.Listen(g.ServerInit.Network, g.Server.Addr)
+			if err != nil {
+				serverLogger.Fatal("Failed to listen:", "error", err)
+			}
+
+			// Unix ドメインソケットのパーミッション設定
+			if g.ServerInit.Network == "unix" {
+				socketPerms := os.FileMode(Config.IntDefault("http.unix.perms", 0666))
+				if err := os.Chmod(g.Server.Addr, socketPerms); err != nil {
+					serverLogger.Fatal("Failed to set socket permissions:", "error", err)
+				}
+				g.unixSocketPath = g.Server.Addr
+				serverLogger.Infof("Unix socket created: %s (perms: %o)", g.Server.Addr, socketPerms)
+			}
 		}
 
 		serverLogger.Warn("Server exiting:", "error", g.Server.Serve(listener))
